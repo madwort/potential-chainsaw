@@ -56,14 +56,15 @@ impl JackTripHeader {
 impl fmt::Display for JackTripHeader {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     unsafe{
-      writeln!(f, "{}: {}\n{}: {}\n{}: {}\n{}: {}\n{}: {}\n{}: {}\n{}: {}\n", 
+      writeln!(f, "{}: {}\n{}: {}\n{}: {}\n{}: {}\n{}: {}\n{}: {}\n{}: {}\n{}: {},{},{}",
         "time_stamp", self.time_stamp,
         "sequence_number", self.sequence_number,
         "buffer_size", self.buffer_size,
         "sampling_rate", self.sampling_rate,
         "bit_resolution", self.bit_resolution,
         "num_channels", self.num_channels,
-        "connection_mode", self.connection_mode
+        "connection_mode", self.connection_mode,
+        "data (extract)", self.jack_data(0),self.jack_data(1),self.jack_data(2),
       )
     }
   }

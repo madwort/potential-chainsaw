@@ -97,12 +97,10 @@ fn jack_test() -> std::io::Result<()> {
       let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
       println!("Struct: {}", s);
 
+      let mut count = 0;
       for v in receive_a_p.iter_mut() {
-        for x in 0..s.buffer_size as usize {
-          // println!("{}", s.jack_data(x));
-          *v = s.jack_data(x);
-        }
-        // time += frame_t;
+        *v = s.jack_data(count);
+        count = count + 1;
       }
       // send_a_p.clone_from_slice(s.data);
       // send_b_p.clone_from_slice(&receive_b_p);
