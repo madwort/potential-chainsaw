@@ -35,7 +35,9 @@ pub struct JackTripHeader {
   pub sequence_number: u16, ///< Sequence Number
   pub buffer_size: u16, ///< Buffer Size in Samples
   pub sampling_rate: SamplingRateT, ///< Sampling Rate in JackAudioInterface::samplingRateT
+  // only support bit_resolution = 16
   pub bit_resolution: u8, ///< Audio Bit Resolution
+  // only support num_channels = 1 at the moment
   pub num_channels: u8, ///< Number of Channels, we assume input and outputs are the same
   pub connection_mode: u8,
   // assume bit res 16 (u16 elements) & max buffer size 256 (array size 256)
