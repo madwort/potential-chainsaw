@@ -23,7 +23,7 @@ impl fmt::Display for SamplingRateT {
       SamplingRateT::SR88  => write!(f, "88kHz"),
       SamplingRateT::SR96  => write!(f, "96kHz"),
       SamplingRateT::SR192 => write!(f, "192kHz"),
-      SamplingRateT::UNDEF => write!(f, "UNKNOWN!")
+      SamplingRateT::UNDEF => write!(f, "UNKNOWN SAMPLE RATE OMG!")
     }
   }
 }
