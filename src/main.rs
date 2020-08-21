@@ -1,19 +1,11 @@
 use std::net::UdpSocket;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::io;
+use crate::jack_trip_header::*;
 
-#[repr(C, packed)]
-#[derive(Debug)]
-struct JTHeader {
-  timeStamp: u64, ///< Time Stamp
-  seqNumber: u16, ///< Sequence Number
-  bufferSize: u16, ///< Buffer Size in Samples
-  samplingRate: u8, ///< Sampling Rate in JackAudioInterface::samplingRateT
-  bitResolution: u8, ///< Audio Bit Resolution
-  numChannels: u8, ///< Number of Channels, we assume input and outputs are the same
-  connectionMode: u8,
-  data: [u8; 18],
-}
+mod jack_trip_header;
+mod udp;
+
 
 fn udp_listen() -> std::io::Result<()> {
   {
@@ -31,13 +23,13 @@ fn udp_listen() -> std::io::Result<()> {
       // println!("src {:?}", src);
 
       // ==v1
-      let s: JTHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
-      println!("Struct: {:?}", s);
+      let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
+      println!("Struct: {}", s);
 
       match SystemTime::now().duration_since(UNIX_EPOCH) {
           Ok(elapsed) => {
               // it prints '2'
-              println!("Time: {:?}, {:?}", s.timeStamp, elapsed);
+              println!("Time: {:?}, {:?}", s.time_stamp, elapsed);
               // println!("{}", elapsed.as_secs());
           }
           Err(e) => {
@@ -62,7 +54,7 @@ fn udp_listen() -> std::io::Result<()> {
   Ok(())
 }
 
-fn jack_test() {
+fn jack_test() -> std::io::Result<()> {
   let (client, _status) = 
     jack::Client::new("madwort_rust_trip", jack::ClientOptions::NO_START_SERVER).unwrap();
   // Register ports. They will be used in a callback that will be
@@ -79,13 +71,39 @@ fn jack_test() {
   let mut send_b = client
       .register_port("rust_send_r", jack::AudioOut::default())
       .unwrap();
+
+  let mut socket = UdpSocket::bind("127.0.0.1:34254")?;
+  // Receives a single datagram message on the socket. If `buf` is too small to hold
+  // the message, it will be cut off.
+  let mut buf = [0; 32];
+
+  let sample_rate = client.sample_rate();
+  let frame_t = 1.0 / sample_rate as f64;
+
   let process_callback = move |_: &jack::Client, ps: &jack::ProcessScope| -> jack::Control {
+    // xrun when nothing to read from buf!
+
       let send_a_p = send_a.as_mut_slice(ps);
-      let send_b_p = send_b.as_mut_slice(ps);
-      let receive_a_p = receive_a.as_slice(ps);
-      let receive_b_p = receive_b.as_slice(ps);
-      send_a_p.clone_from_slice(&receive_a_p);
-      send_b_p.clone_from_slice(&receive_b_p);
+      // let send_b_p = send_b.as_mut_slice(ps);
+      // let receive_a_p = receive_a.as_slice(ps);
+      // let receive_b_p = receive_b.as_slice(ps);
+      let (amt, src) = socket.recv_from(&mut buf).unwrap();
+      let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
+      println!("Struct: {}", s);
+
+      for v in send_a_p.iter_mut() {
+        for w in s.data.iter(){
+          *v = *w as f32;
+        }
+        // time += frame_t;
+      }
+      // send_a_p.clone_from_slice(s.data);
+      // send_b_p.clone_from_slice(&receive_b_p);
+
+      let buf = &mut buf[..amt];
+      // if we don't reverse it, jacktrip client accepts it & sends more!
+      // buf.reverse();
+      socket.send_to(buf, &src);
       jack::Control::Continue
   };
   let process = jack::ClosureProcessHandler::new(process_callback);
@@ -99,6 +117,7 @@ fn jack_test() {
   io::stdin().read_line(&mut user_input).ok();
 
   active_client.deactivate().unwrap();
+  Ok(())
 }
 
 fn main() -> std::io::Result<()> {
