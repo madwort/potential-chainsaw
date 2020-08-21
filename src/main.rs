@@ -62,25 +62,26 @@ fn udp_listen() -> std::io::Result<()> {
 fn jack_test() -> std::io::Result<()> {
   let (client, _status) = 
     jack::Client::new("madwort_rust_trip", jack::ClientOptions::NO_START_SERVER).unwrap();
-  // Register ports. They will be used in a callback that will be
-  // called when new data is available.
-  let receive_a = client
-      .register_port("rust_receive_l", jack::AudioIn::default())
+
+  // "Receive" takes audio data from the network and sends it to the local jack server
+  // Therefore it is an AudioOut port from the perspective of this program
+  let mut receive_a = client
+      .register_port("rust_receive_l", jack::AudioOut::default())
       .unwrap();
-  let receive_b = client
-      .register_port("rust_receive_r", jack::AudioIn::default())
+  // let receive_b = client
+  //     .register_port("rust_receive_r", jack::AudioIn::default())
+  //     .unwrap();
+  let send_a = client
+      .register_port("rust_send_l", jack::AudioIn::default())
       .unwrap();
-  let mut send_a = client
-      .register_port("rust_send_l", jack::AudioOut::default())
-      .unwrap();
-  let mut send_b = client
-      .register_port("rust_send_r", jack::AudioOut::default())
-      .unwrap();
+  // let mut send_b = client
+  //     .register_port("rust_send_r", jack::AudioOut::default())
+  //     .unwrap();
 
   let mut socket = UdpSocket::bind("127.0.0.1:34254")?;
   // Receives a single datagram message on the socket. If `buf` is too small to hold
   // the message, it will be cut off.
-  let mut buf = [0; 32];
+  let mut buf = [0; 528];
 
   let sample_rate = client.sample_rate();
   let frame_t = 1.0 / sample_rate as f64;
@@ -88,7 +89,7 @@ fn jack_test() -> std::io::Result<()> {
   let process_callback = move |_: &jack::Client, ps: &jack::ProcessScope| -> jack::Control {
     // xrun when nothing to read from buf!
 
-      let send_a_p = send_a.as_mut_slice(ps);
+      let receive_a_p = receive_a.as_mut_slice(ps);
       // let send_b_p = send_b.as_mut_slice(ps);
       // let receive_a_p = receive_a.as_slice(ps);
       // let receive_b_p = receive_b.as_slice(ps);
@@ -96,9 +97,10 @@ fn jack_test() -> std::io::Result<()> {
       let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
       println!("Struct: {}", s);
 
-      for v in send_a_p.iter_mut() {
-        for w in s.data.iter(){
-          *v = *w as f32;
+      for v in receive_a_p.iter_mut() {
+        for x in 0..s.buffer_size as usize {
+          // println!("{}", s.jack_data(x));
+          *v = s.jack_data(x);
         }
         // time += frame_t;
       }

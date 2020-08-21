@@ -42,6 +42,15 @@ pub struct JackTripHeader {
   pub data: [i16; 256], // Jack frames per period size (typically 64/128/256 etc)
 }
 
+impl JackTripHeader {
+  pub fn jack_data(&self, index: usize) -> f32{
+    if self.bit_resolution != 16 {
+      panic!("We only support jacktrip packets with 16bit audio data!!");
+    }
+    self.data[index] as f32 / 32768.0
+  }
+}
+
 impl fmt::Display for JackTripHeader {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     unsafe{
