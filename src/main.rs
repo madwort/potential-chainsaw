@@ -12,7 +12,17 @@ fn udp_listen() -> std::io::Result<()> {
     let mut socket = UdpSocket::bind("127.0.0.1:34254")?;
     // Receives a single datagram message on the socket. If `buf` is too small to hold
     // the message, it will be cut off.
-    let mut buf = [0; 32];
+
+    // Current static calculations:
+    // header size = 64+16+16+8+8+8+8 = 128
+    // jack frame size = 16*256 = 4096
+    // therefore buffer size is (4096+128)/8 => u8 array length 528
+
+    let mut buf = [0; 528];
+    // output the connection details from the first packet
+    socket.recv_from(&mut buf)?;
+    let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
+    println!("{}", s);
 
     while true {
 
@@ -37,11 +47,6 @@ fn udp_listen() -> std::io::Result<()> {
               println!("Error: {:?}", e);
           }
       }
-      // attempt to read directly...
-      // actually should use something like `ptr << u16`?
-      // unsafe {
-      //   println!("{:?}", std::ptr::slice_from_raw_parts(buf.as_ptr(), 16));
-      // }
 
       // Redeclare `buf` as slice of the received data and send reverse data back to origin.
       let buf = &mut buf[..amt];
