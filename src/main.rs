@@ -1,4 +1,6 @@
+use std::env;
 use std::net::UdpSocket;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::io;
 use std::convert::TryInto;
@@ -19,7 +21,39 @@ fn verify_connection_params(s: JackTripHeader, sample_rate: usize) {
   assert!(s.buffer_size == 128);
 }
 
-fn jack_test() -> std::io::Result<()> {
+fn send_first_packet(socket_send: std::net::UdpSocket, src: std::net::SocketAddr) -> [u8; 528]{
+  let mut timestamp_bytes = get_current_timestamp();
+
+  let mut outgoing_buf = [0u8; 528];
+  outgoing_buf[0..8].copy_from_slice(&timestamp_bytes);
+  // Hardcode for now
+  outgoing_buf[8] = 0u16.to_le_bytes()[0];
+  outgoing_buf[9] = 0u16.to_le_bytes()[0];
+  outgoing_buf[10] = 128u16.to_le_bytes()[0];
+  outgoing_buf[11] = 128u16.to_le_bytes()[1];
+  outgoing_buf[12] = 3;
+  outgoing_buf[13] = 16;
+  outgoing_buf[14] = 1;
+  outgoing_buf[15] = 0;
+  let t: JackTripHeader = unsafe { std::ptr::read(outgoing_buf.as_ptr() as *const _)};
+  println!("Output: {}", t);
+
+  socket_send.send_to(&outgoing_buf, &src).unwrap();
+  // We're going to re-use this buffer, so return it
+  outgoing_buf
+}
+
+fn receive_first_packet(mut buf: [u8; 528],
+    socket_receive: std::net::UdpSocket,
+    sample_rate: usize) -> std::net::SocketAddr
+{
+  let (_amt, src) = socket_receive.recv_from(&mut buf).unwrap();
+  let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
+  verify_connection_params(s, sample_rate);
+  src
+}
+
+fn jack_test(debug_mode: bool, client_mode: bool, client_address: std::string::String) -> std::io::Result<()> {
   let (client_receive, _status) =
     jack::Client::new("madwort_rust_trip_receive", jack::ClientOptions::NO_START_SERVER).unwrap();
   let (client_send, _status) =
@@ -35,30 +69,34 @@ fn jack_test() -> std::io::Result<()> {
       .unwrap();
 
   let socket_receive = UdpSocket::bind("127.0.0.1:34254")?;
+  // if client_mode {
+  //   socket_receive.connect(client_address);
+  // }
   let socket_send = socket_receive.try_clone()?;
 
   // Receives a single datagram message on the socket. If `buf` is too small to hold
   // the message, it will be cut off.
   let mut buf = [0u8; 528];
 
-  // get the first packet, so that we can check some params
-  let (_amt, src) = socket_receive.recv_from(&mut buf)?;
-  let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
-  verify_connection_params(s, client_receive.sample_rate());
-
   let mut outgoing_buf = [0u8; 528];
-  let mut outgoing_sequence_number = 0u16;
 
-  // Mirror source data back to itself for now
-  let mut timestamp_bytes = get_current_timestamp();
+  if client_mode {
+    let src = SocketAddr::new(client_address.parse().unwrap(), 4464);
+    println!("client mode src: {:?}", src);
+    outgoing_buf = send_first_packet(socket_send.try_clone().unwrap(), src);
+  }
 
-  outgoing_buf[0..8].copy_from_slice(&timestamp_bytes);
-  outgoing_buf[8..10].copy_from_slice(&outgoing_sequence_number.to_le_bytes());
-  // Duplicate all other data from the input packet
-  outgoing_buf[10..16].copy_from_slice(&buf[10..16]);
-  socket_send.send_to(&outgoing_buf, &src).unwrap();
+  let src = receive_first_packet(buf, socket_receive.try_clone().unwrap(), client_receive.sample_rate());
+
+  if !client_mode {
+    // socket_receive.connect(src);
+    println!("server mode src: {:?}", src);
+    outgoing_buf = send_first_packet(socket_send.try_clone().unwrap(), src);
+  }
 
   // Create some temp vars to use in the process_callback
+  let mut timestamp_bytes = get_current_timestamp();
+  let mut outgoing_sequence_number = 1u16;
   let mut temp_audio_data = [0u8; 2];
   let mut count = 0;
 
@@ -70,9 +108,10 @@ fn jack_test() -> std::io::Result<()> {
       // let receive_b_p = receive_b.as_mut_slice(ps);
       socket_receive.recv_from(&mut buf).unwrap();
 
-      // Debug output
-      let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
-      println!("Input: {}", s);
+      if debug_mode {
+        let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
+        println!("Input: {}", s);
+      }
 
       // TODO: get rid of these ugly count vars!!! OMG!
       count = 16;
@@ -103,6 +142,11 @@ fn jack_test() -> std::io::Result<()> {
       outgoing_buf[0..8].copy_from_slice(&timestamp_bytes);
       outgoing_buf[8..10].copy_from_slice(&outgoing_sequence_number.to_le_bytes());
 
+      if debug_mode {
+        let t: JackTripHeader = unsafe { std::ptr::read(outgoing_buf.as_ptr() as *const _)};
+        println!("Output: {}", t);
+      }
+
       socket_send.send_to(&outgoing_buf, &src).unwrap();
       jack::Control::Continue
   };
@@ -124,6 +168,20 @@ fn jack_test() -> std::io::Result<()> {
   Ok(())
 }
 
-fn main() -> std::io::Result<()> {
-    jack_test()
+fn main() {
+  let args: Vec<String> = env::args().collect();
+  // println!("{:?}", args);
+
+  let debug_mode = false;
+
+  if args.len() < 2 {
+    panic!("Please specify `-c IPADDRESS` or `-s`");
+  }
+  if args[1] == "-c" {
+    jack_test(debug_mode, true, args[2].clone());
+  }
+  if args[1] == "-s" {
+    jack_test(debug_mode, false, "".to_string());
+  }
+  panic!("Please specify server or client");
 }
