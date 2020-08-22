@@ -1,5 +1,5 @@
 use std::net::UdpSocket;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{SocketAddr};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::io;
 use std::convert::TryInto;
@@ -18,7 +18,7 @@ fn verify_connection_params(s: JackTripHeader, sample_rate: usize) {
 }
 
 fn send_first_packet(socket_send: std::net::UdpSocket, src: std::net::SocketAddr) -> [u8; 528]{
-  let mut timestamp_bytes = get_current_timestamp();
+  let timestamp_bytes = get_current_timestamp();
 
   let mut outgoing_buf = [0u8; 528];
   outgoing_buf[0..8].copy_from_slice(&timestamp_bytes);
