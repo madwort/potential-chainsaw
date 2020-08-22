@@ -10,7 +10,10 @@ https://github.com/madwort/potential-chainsaw
 
 ```bash
 $ cargo build
-$ ./target/debug/jacktrip-rust
+# Server mode
+$ ./target/debug/jacktrip-rust -s
+# Client mode
+$ ./target/debug/jacktrip-rust -c 127.0.0.1
 ```
 
 Test/demo app:
