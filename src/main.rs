@@ -8,6 +8,17 @@ use crate::jack_notifications::Notifications;
 mod jack_trip_header;
 mod jack_notifications;
 
+fn get_current_timestamp() -> [u8; 8]{
+  (SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_micros() as u64).to_le_bytes()
+}
+
+fn verify_connection_params(s: JackTripHeader, sample_rate: usize) {
+  assert!(s.sampling_rate.as_numeric() == sample_rate);
+  assert!(s.bit_resolution == 16);
+  assert!(s.num_channels == 1);
+  assert!(s.buffer_size == 128);
+}
+
 fn jack_test() -> std::io::Result<()> {
   let (client_receive, _status) =
     jack::Client::new("madwort_rust_trip_receive", jack::ClientOptions::NO_START_SERVER).unwrap();
@@ -19,18 +30,13 @@ fn jack_test() -> std::io::Result<()> {
   let mut receive_a = client_receive
       .register_port("rust_receive_l", jack::AudioOut::default())
       .unwrap();
-  // let receive_b = client
-  //     .register_port("rust_receive_r", jack::AudioIn::default())
-  //     .unwrap();
   let send_a = client_send
       .register_port("rust_send_l", jack::AudioIn::default())
       .unwrap();
-  // let mut send_b = client
-  //     .register_port("rust_send_r", jack::AudioOut::default())
-  //     .unwrap();
 
   let socket_receive = UdpSocket::bind("127.0.0.1:34254")?;
   let socket_send = socket_receive.try_clone()?;
+
   // Receives a single datagram message on the socket. If `buf` is too small to hold
   // the message, it will be cut off.
   let mut buf = [0u8; 528];
@@ -38,17 +44,13 @@ fn jack_test() -> std::io::Result<()> {
   // get the first packet, so that we can check some params
   let (_amt, src) = socket_receive.recv_from(&mut buf)?;
   let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
-  assert!(s.sampling_rate.as_numeric() == client_receive.sample_rate());
-  assert!(s.bit_resolution == 16);
-  assert!(s.num_channels == 1);
-  assert!(s.buffer_size == 128);
+  verify_connection_params(s, client_receive.sample_rate());
 
   let mut outgoing_buf = [0u8; 528];
   let mut outgoing_sequence_number = 0u16;
 
   // Mirror source data back to itself for now
-  let mut timestamp_bytes =
-    (SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_micros() as u64).to_le_bytes();
+  let mut timestamp_bytes = get_current_timestamp();
 
   outgoing_buf[0..8].copy_from_slice(&timestamp_bytes);
   outgoing_buf[8..10].copy_from_slice(&outgoing_sequence_number.to_le_bytes());
@@ -94,8 +96,7 @@ fn jack_test() -> std::io::Result<()> {
       // send_a_p.clone_from_slice(output_packet.data);
       // send_b_p.clone_from_slice(&receive_b_p);
 
-      timestamp_bytes =
-        (SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_micros() as u64).to_le_bytes();
+      timestamp_bytes = get_current_timestamp();
 
       outgoing_sequence_number = outgoing_sequence_number + 1;
       outgoing_buf[0..8].copy_from_slice(&timestamp_bytes);
