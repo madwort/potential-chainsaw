@@ -1,6 +1,7 @@
 use std::net::UdpSocket;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::io;
+// use std::slice;
 use crate::jack_trip_header::*;
 
 mod jack_trip_header;
@@ -81,7 +82,7 @@ fn jack_test() -> std::io::Result<()> {
   let mut socket = UdpSocket::bind("127.0.0.1:34254")?;
   // Receives a single datagram message on the socket. If `buf` is too small to hold
   // the message, it will be cut off.
-  let mut buf = [0; 528];
+  let mut buf = [0u8; 528];
 
   // get the first packet, so that we can check some params
   socket.recv_from(&mut buf)?;
@@ -93,27 +94,37 @@ fn jack_test() -> std::io::Result<()> {
 
   let sample_rate = client.sample_rate();
   let frame_t = 1.0 / sample_rate as f64;
-  let mut output_sequence_number = 0;
 
-  // TODO: don't hardcode these vars!!
-  let mut output_packet: JackTripHeader = JackTripHeader {
-    time_stamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_micros() as u64,
-    sequence_number: output_sequence_number,
-    buffer_size: 128,
-    sampling_rate: SamplingRateT::SR48,
-    bit_resolution: 16,
-    num_channels: 1,
-    connection_mode: 0,
-    data: [0; 256],
-  };
+  let mut outgoing_buf = [0u8; 528];
+  let mut outgoing_sequence_number = 0u16;
+
+  // Mirror source data back to itself for now
+  let mut timestamp_bytes =
+    (SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_micros() as u64).to_le_bytes();
+  // TODO: there *MUST* be a better way of doing this copy, instead of a for loop!
+  for x in 0..8 {
+    outgoing_buf[x] = timestamp_bytes[x];
+  }
+  outgoing_buf[8] = outgoing_sequence_number.to_le_bytes()[0];
+  outgoing_buf[9] = outgoing_sequence_number.to_le_bytes()[1];
+  outgoing_buf[10] = 128u16.to_le_bytes()[0];
+  outgoing_buf[11] = 128u16.to_le_bytes()[1];
+  outgoing_buf[12] = buf[12];
+  outgoing_buf[13] = buf[13];
+  outgoing_buf[14] = buf[14];
+  outgoing_buf[15] = buf[15];
+
+  let mut temp_audio_data = [0u8; 2];
 
   let process_callback = move |_: &jack::Client, ps: &jack::ProcessScope| -> jack::Control {
     // xrun when nothing to read from buf!
 
+    // TODO: move all of these `let` expressions out of this function!
       let receive_a_p = receive_a.as_mut_slice(ps);
       // let receive_b_p = receive_b.as_mut_slice(ps);
       let (amt, src) = socket.recv_from(&mut buf).unwrap();
       let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
+
       println!("Input: {}", s);
 
       // TODO: get rid of these ugly count vars!!! OMG!
@@ -124,21 +135,27 @@ fn jack_test() -> std::io::Result<()> {
       }
 
       let send_a_p = send_a.as_slice(ps);
-      // let send_b_p = send_b.as_slice(ps);
-      count = 0;
+      // // let send_b_p = send_b.as_slice(ps);
+      count = 16;
       for v in send_a_p.iter() {
-        count = count + 1;
+        temp_audio_data = (((*v) * 32768.0) as i16).to_le_bytes();
+        outgoing_buf[count] = temp_audio_data[0];
+        outgoing_buf[count+1] = temp_audio_data[1];
+        count = count + 2;
       }
       // send_a_p.clone_from_slice(output_packet.data);
       // send_b_p.clone_from_slice(&receive_b_p);
-      output_sequence_number = output_sequence_number + 1;
-      output_packet.time_stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_micros() as u64;
-      output_packet.sequence_number = output_sequence_number;
-      println!("Output: {}", output_packet);
-      let buf = &mut buf[..amt];
-      // if we don't reverse it, jacktrip client accepts it & sends more!
-      // buf.reverse();
-      socket.send_to(buf, &src);
+
+      timestamp_bytes =
+        (SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_micros() as u64).to_le_bytes();
+      // TODO: there *MUST* be a better way of doing this!
+      for x in 0..8 {
+        outgoing_buf[x] = timestamp_bytes[x];
+      }
+      outgoing_buf[8] = outgoing_sequence_number.to_le_bytes()[0];
+      outgoing_buf[9] = outgoing_sequence_number.to_le_bytes()[1];
+
+      socket.send_to(&outgoing_buf, &src).unwrap();
       jack::Control::Continue
   };
   let process = jack::ClosureProcessHandler::new(process_callback);

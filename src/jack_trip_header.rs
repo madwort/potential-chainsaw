@@ -68,12 +68,13 @@ impl JackTripHeader {
     self.data[index] as f32 / 32768.0
   }
 
-  pub fn set_jack_data(&self, index: usize, datum: f32){
-    if self.bit_resolution != 16 {
-      panic!("We only support jacktrip packets with 16bit audio data!!");
-    }
-    self.data[index] = (datum * 32768.0) as i16;
-  }
+  // TO REMOVE: this does not work! I do not understand memory management!
+  // pub fn set_jack_data(&self, index: usize, datum: f32){
+  //   if self.bit_resolution != 16 {
+  //     panic!("We only support jacktrip packets with 16bit audio data!!");
+  //   }
+  //   self.data[index] = (datum * 32768.0) as i16;
+  // }
 }
 
 impl fmt::Display for JackTripHeader {
