@@ -28,6 +28,22 @@ impl fmt::Display for SamplingRateT {
   }
 }
 
+impl SamplingRateT {
+  pub fn as_numeric(&self) -> usize {
+    let numeric_sample_rate = match self {
+      SamplingRateT::SR22 => 22050,
+      SamplingRateT::SR32 => 32000,
+      SamplingRateT::SR44 => 44100,
+      SamplingRateT::SR48 => 48000,
+      SamplingRateT::SR88 => 88000,
+      SamplingRateT::SR96 => 96000,
+      SamplingRateT::SR192 => 192000,
+      SamplingRateT::UNDEF => 0
+    };
+    return numeric_sample_rate;
+  }
+}
+
 #[repr(C, packed)]
 // #[derive(Debug)]
 pub struct JackTripHeader {
@@ -45,7 +61,7 @@ pub struct JackTripHeader {
 }
 
 impl JackTripHeader {
-  pub fn jack_data(&self, index: usize) -> f32{
+  pub fn get_jack_data(&self, index: usize) -> f32{
     if self.bit_resolution != 16 {
       panic!("We only support jacktrip packets with 16bit audio data!!");
     }
@@ -64,7 +80,7 @@ impl fmt::Display for JackTripHeader {
         "bit_resolution", self.bit_resolution,
         "num_channels", self.num_channels,
         "connection_mode", self.connection_mode,
-        "data (extract)", self.jack_data(0),self.jack_data(1),self.jack_data(2),
+        "data (extract)", self.get_jack_data(0),self.get_jack_data(1),self.get_jack_data(2),
       )
     }
   }

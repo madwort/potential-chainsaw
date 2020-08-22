@@ -83,28 +83,58 @@ fn jack_test() -> std::io::Result<()> {
   // the message, it will be cut off.
   let mut buf = [0; 528];
 
+  // get the first packet, so that we can check some params
+  socket.recv_from(&mut buf)?;
+  let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
+  assert!(s.sampling_rate.as_numeric() == client.sample_rate());
+  assert!(s.bit_resolution == 16);
+  assert!(s.num_channels == 1);
+  assert!(s.buffer_size == 128);
+
   let sample_rate = client.sample_rate();
   let frame_t = 1.0 / sample_rate as f64;
+  let mut output_sequence_number = 0;
+
+  // TODO: don't hardcode these vars!!
+  let mut output_packet: JackTripHeader = JackTripHeader {
+    time_stamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_micros() as u64,
+    sequence_number: output_sequence_number,
+    buffer_size: 128,
+    sampling_rate: SamplingRateT::SR48,
+    bit_resolution: 16,
+    num_channels: 1,
+    connection_mode: 0,
+    data: [0; 256],
+  };
 
   let process_callback = move |_: &jack::Client, ps: &jack::ProcessScope| -> jack::Control {
     // xrun when nothing to read from buf!
 
       let receive_a_p = receive_a.as_mut_slice(ps);
-      // let send_b_p = send_b.as_mut_slice(ps);
-      // let receive_a_p = receive_a.as_slice(ps);
-      // let receive_b_p = receive_b.as_slice(ps);
+      // let receive_b_p = receive_b.as_mut_slice(ps);
       let (amt, src) = socket.recv_from(&mut buf).unwrap();
       let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
-      println!("Struct: {}", s);
+      println!("Input: {}", s);
 
+      // TODO: get rid of these ugly count vars!!! OMG!
       let mut count = 0;
       for v in receive_a_p.iter_mut() {
-        *v = s.jack_data(count);
+        *v = s.get_jack_data(count);
         count = count + 1;
       }
-      // send_a_p.clone_from_slice(s.data);
-      // send_b_p.clone_from_slice(&receive_b_p);
 
+      let send_a_p = send_a.as_slice(ps);
+      // let send_b_p = send_b.as_slice(ps);
+      count = 0;
+      for v in send_a_p.iter() {
+        count = count + 1;
+      }
+      // send_a_p.clone_from_slice(output_packet.data);
+      // send_b_p.clone_from_slice(&receive_b_p);
+      output_sequence_number = output_sequence_number + 1;
+      output_packet.time_stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_micros() as u64;
+      output_packet.sequence_number = output_sequence_number;
+      println!("Output: {}", output_packet);
       let buf = &mut buf[..amt];
       // if we don't reverse it, jacktrip client accepts it & sends more!
       // buf.reverse();
