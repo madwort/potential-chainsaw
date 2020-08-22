@@ -47,12 +47,8 @@ fn jack_test() -> std::io::Result<()> {
 
   outgoing_buf[0..8].copy_from_slice(&timestamp_bytes);
   outgoing_buf[8..10].copy_from_slice(&outgoing_sequence_number.to_le_bytes());
-  outgoing_buf[10] = 128u16.to_le_bytes()[0];
-  outgoing_buf[11] = 128u16.to_le_bytes()[1];
-  outgoing_buf[12] = buf[12];
-  outgoing_buf[13] = buf[13];
-  outgoing_buf[14] = buf[14];
-  outgoing_buf[15] = buf[15];
+  // Duplicate all other data from the input packet
+  outgoing_buf[10..16].copy_from_slice(&buf[10..16]);
 
   // Create some temp vars to use in the process_callback
   let mut temp_audio_data = [0u8; 2];
