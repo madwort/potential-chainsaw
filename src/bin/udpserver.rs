@@ -145,10 +145,10 @@ fn main() -> std::io::Result<()> {
         "time_stamp", u64::from_le_bytes(buf[0..8].try_into().unwrap()),
         "sequence_number", u16::from_le_bytes(buf[8..10].try_into().unwrap()),
         "buffer_size", u16::from_le_bytes(buf[10..12].try_into().unwrap()),
-        "sampling_rate", SamplingRateT::from(u8::from_le_bytes(buf[12..13].try_into().unwrap())),
-        "bit_resolution", u8::from_le_bytes(buf[13..14].try_into().unwrap()),
-        "num_channels", u8::from_le_bytes(buf[14..15].try_into().unwrap()),
-        "connection_mode", u8::from_le_bytes(buf[15..16].try_into().unwrap())
+        "sampling_rate", SamplingRateT::from(buf[12]),
+        "bit_resolution", buf[13],
+        "num_channels", buf[14],
+        "connection_mode", buf[15]
       );
 
       while true {
