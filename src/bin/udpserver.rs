@@ -1,9 +1,11 @@
 use std::net::UdpSocket;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::fmt;
+use std::convert::TryInto;
 
 // Sampling Rates supported by JACK
 // Copied from jacktrip/AudioInterface.h
+// This is packed as a u8
 enum SamplingRateT {
     SR22, ///<  22050 Hz
     SR32, ///<  32000 Hz
@@ -30,6 +32,21 @@ impl fmt::Display for SamplingRateT {
   }
 }
 
+impl From<u8> for SamplingRateT {
+  fn from(item: u8) -> Self {
+    match item {
+      0 => SamplingRateT::SR22,
+      1 => SamplingRateT::SR32,
+      2 => SamplingRateT::SR44,
+      3 => SamplingRateT::SR48,
+      4 => SamplingRateT::SR88,
+      5 => SamplingRateT::SR96,
+      6 => SamplingRateT::SR192,
+      _ => SamplingRateT::UNDEF
+    }
+  }
+}
+
 #[repr(C, packed)]
 // #[derive(Debug)]
 struct JackTripHeader {
@@ -40,7 +57,7 @@ struct JackTripHeader {
   bit_resolution: u8, ///< Audio Bit Resolution
   num_channels: u8, ///< Number of Channels, we assume input and outputs are the same
   connection_mode: u8,
-  // assume bit res 16 (u16 elements) & max buffer size 256 (array size 256)
+  // assume bit res 16 (i16 elements) & max buffer size 256 (array size 256)
   data: [i16; 256], // Jack frames per period size (typically 64/128/256 etc)
 }
 
@@ -69,6 +86,40 @@ impl fmt::Display for JackTripHeader {
   }
 }
 
+fn print_sample_data_from_buf_unsafe(buf: &[u8]) {
+  let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
+  println!("Buffer size u8 {}", s.buffer_size);
+
+  for x in 0..s.buffer_size as usize {
+    println!("{} ; {:?} ; {:?}", x, s.jack_data(x), s.data[x]);
+  }
+
+  // println!("Struct: {:?}", s);
+}
+
+fn print_sample_data_from_buf(buf: &[u8]) {
+  let buffer_size_direct_read = u16::from_le_bytes(buf[10..12].try_into().unwrap());
+  println!("Buffer size u8 {}", buffer_size_direct_read);
+
+  for x in 0..buffer_size_direct_read as usize {
+    println!("{} ; {:?}", x,
+      i16::from_le_bytes(buf[((x*2)+16)..((x*2)+18)].try_into().unwrap())
+    );
+  }
+}
+
+fn print_sample_data_from_buf_both(buf: &[u8]) {
+  let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
+  let buffer_size_direct_read = u16::from_le_bytes(buf[10..12].try_into().unwrap());
+  println!("Buffer size u8 {}", buffer_size_direct_read);
+
+  for x in 0..buffer_size_direct_read as usize {
+    println!("{} ; {:?}; {:?}", x, s.data[x],
+      i16::from_le_bytes(buf[((x*2)+16)..((x*2)+18)].try_into().unwrap())
+    );
+  }
+}
+
 fn main() -> std::io::Result<()> {
     {
       let mut socket = UdpSocket::bind("127.0.0.1:34254")?;
@@ -84,8 +135,21 @@ fn main() -> std::io::Result<()> {
 
       // output the connection details from the first packet
       socket.recv_from(&mut buf)?;
+
+      println!("Read the buffer using unsafe case");
       let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
       println!("{}", s);
+
+      println!("Read the buffer using try_into / from_le_bytes etc");
+      println!("{}: {}\n{}: {}\n{}: {}\n{}: {}\n{}: {}\n{}: {}\n{}: {}\n",
+        "time_stamp", u64::from_le_bytes(buf[0..8].try_into().unwrap()),
+        "sequence_number", u16::from_le_bytes(buf[8..10].try_into().unwrap()),
+        "buffer_size", u16::from_le_bytes(buf[10..12].try_into().unwrap()),
+        "sampling_rate", SamplingRateT::from(u8::from_le_bytes(buf[12..13].try_into().unwrap())),
+        "bit_resolution", u8::from_le_bytes(buf[13..14].try_into().unwrap()),
+        "num_channels", u8::from_le_bytes(buf[14..15].try_into().unwrap()),
+        "connection_mode", u8::from_le_bytes(buf[15..16].try_into().unwrap())
+      );
 
       while true {
 
@@ -95,22 +159,7 @@ fn main() -> std::io::Result<()> {
         // println!("amt {:?}", amt);
         // println!("src {:?}", src);
 
-        // ==v1
-        let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
-        let mut count = 0;
-
-        // for x in s.data.iter() {
-        //  println!("{} - {:?}", count, x);
-        // }
-
-        println!("Buffer size u8 {}", s.buffer_size);
-
-        for x in 0..s.buffer_size as usize {
-          println!("{} - {:?} - {:?}", x, s.data[x], s.jack_data(x));
-          count = count+1;
-        }
-        // println!("{:?}", buf);
-        // println!("Struct: {:?}", s);
+        print_sample_data_from_buf_both(&buf);
 
         match SystemTime::now().duration_since(UNIX_EPOCH) {
             Ok(elapsed) => {
