@@ -86,17 +86,20 @@ impl fmt::Display for JackTripHeader {
   }
 }
 
+#[allow(dead_code)]
 fn print_sample_data_from_buf_unsafe(buf: &[u8]) {
-  let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
-  println!("Buffer size u8 {}", s.buffer_size);
-
-  for x in 0..s.buffer_size as usize {
-    println!("{} ; {:?} ; {:?}", x, s.jack_data(x), s.data[x]);
+  unsafe {
+    let s: JackTripHeader = std::ptr::read(buf.as_ptr() as *const _);
+    println!("Buffer size u8 {}", s.buffer_size);
+    for x in 0..s.buffer_size as usize {
+      println!("{} ; {:?} ; {:?}", x, s.jack_data(x), s.data[x]);
+    }
   }
 
   // println!("Struct: {:?}", s);
 }
 
+#[allow(dead_code)]
 fn print_sample_data_from_buf(buf: &[u8]) {
   let buffer_size_direct_read = u16::from_le_bytes(buf[10..12].try_into().unwrap());
   println!("Buffer size u8 {}", buffer_size_direct_read);
@@ -114,15 +117,17 @@ fn print_sample_data_from_buf_both(buf: &[u8]) {
   println!("Buffer size u8 {}", buffer_size_direct_read);
 
   for x in 0..buffer_size_direct_read as usize {
-    println!("{} ; {:?}; {:?}", x, s.data[x],
-      i16::from_le_bytes(buf[((x*2)+16)..((x*2)+18)].try_into().unwrap())
-    );
+    unsafe {
+      println!("{} ; {:?}; {:?}", x, s.data[x],
+        i16::from_le_bytes(buf[((x*2)+16)..((x*2)+18)].try_into().unwrap())
+      );
+    }
   }
 }
 
 fn main() -> std::io::Result<()> {
     {
-      let mut socket = UdpSocket::bind("127.0.0.1:34254")?;
+      let socket = UdpSocket::bind("127.0.0.1:34254")?;
       // Receives a single datagram message on the socket. If `buf` is too small to hold
       // the message, it will be cut off.
 
@@ -176,9 +181,11 @@ fn main() -> std::io::Result<()> {
 
       // return Ok(());
 
+      // We should use loop here, but it conflicts with the Result return type...
+      #[allow(while_true)]
       while true {
 
-        let (amt, src) = socket.recv_from(&mut buf)?;
+        let (_amt, src) = socket.recv_from(&mut buf)?;
 
         // println!("{:?}", buf);
         // println!("amt {:?}", amt);
@@ -189,7 +196,9 @@ fn main() -> std::io::Result<()> {
         match SystemTime::now().duration_since(UNIX_EPOCH) {
             Ok(elapsed) => {
                 // it prints '2'
-                println!("Time: {:?}, {:?}", s.time_stamp, elapsed);
+                unsafe{
+                  println!("Time: {:?}, {:?}", s.time_stamp, elapsed);
+                }
                 // println!("{}", elapsed.as_secs());
             }
             Err(e) => {
@@ -204,6 +213,7 @@ fn main() -> std::io::Result<()> {
         for x in 0..8 {
           outgoing_buf[x] = timestamp_bytes[x];
         }
+        outgoing_sequence_number = outgoing_sequence_number + 1;
         outgoing_buf[8] = outgoing_sequence_number.to_le_bytes()[0];
         outgoing_buf[9] = outgoing_sequence_number.to_le_bytes()[1];
         socket.send_to(&outgoing_buf, &src)?;
