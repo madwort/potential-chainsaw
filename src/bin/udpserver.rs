@@ -130,11 +130,11 @@ fn main() -> std::io::Result<()> {
       // header size = 64+16+16+8+8+8+8 = 128
       // jack frame size = 16*256 = 4096
       // therefore buffer size is (4096+128)/8 => u8 array length 528
-      
+
       let mut buf = [0u8; 528];
 
       // output the connection details from the first packet
-      socket.recv_from(&mut buf)?;
+      let (amt, src) = socket.recv_from(&mut buf)?;
 
       println!("Read the buffer using unsafe case");
       let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
@@ -150,6 +150,25 @@ fn main() -> std::io::Result<()> {
         "num_channels", buf[14],
         "connection_mode", buf[15]
       );
+
+      // Send our first outbound packet, reflecting details back at them
+      let mut outgoing_buf = [0u8; 528];
+
+      // Mirror source data back to itself for now
+      let mut timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_micros() as u64;
+      // TODO: there *MUST* be a better way of doing this!
+      for x in 0..8 {
+        outgoing_buf[x] = timestamp.to_le_bytes()[x];
+      }
+      outgoing_buf[10] = 128u16.to_le_bytes()[0];
+      outgoing_buf[11] = 128u16.to_le_bytes()[1];
+      outgoing_buf[12] = buf[12];
+      outgoing_buf[13] = buf[13];
+      outgoing_buf[14] = buf[14];
+      outgoing_buf[15] = buf[15];
+      let t: JackTripHeader = unsafe { std::ptr::read(outgoing_buf.as_ptr() as *const _)};
+      println!("{}", t);
+      socket.send_to(&outgoing_buf, &src)?;
 
       while true {
 
@@ -173,14 +192,9 @@ fn main() -> std::io::Result<()> {
             }
         }
 
-        // Redeclare `buf` as slice of the received data and send reverse data back to origin.
-        let buf = &mut buf[..amt];
-        // if we don't reverse it, jacktrip client accepts it & sends more!
-        // buf.reverse();
-        socket.send_to(buf, &src)?;
-        // break;
+        socket.send_to(&outgoing_buf, &src)?;
       }
 
-    } // the socket is closed here
+    }
     Ok(())
 }
