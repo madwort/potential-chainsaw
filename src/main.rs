@@ -96,6 +96,7 @@ fn jack_test() -> std::io::Result<()> {
       // send_a_p.clone_from_slice(output_packet.data);
       // send_b_p.clone_from_slice(&receive_b_p);
 
+      // TODO: occasional crashes here
       timestamp_bytes = get_current_timestamp();
 
       outgoing_sequence_number = outgoing_sequence_number + 1;
