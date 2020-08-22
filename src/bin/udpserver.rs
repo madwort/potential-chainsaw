@@ -80,7 +80,7 @@ fn main() -> std::io::Result<()> {
       // jack frame size = 16*256 = 4096
       // therefore buffer size is (4096+128)/8 => u8 array length 528
       
-      let mut buf = [0; 528];
+      let mut buf = [0u8; 528];
 
       // output the connection details from the first packet
       socket.recv_from(&mut buf)?;
