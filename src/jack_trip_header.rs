@@ -44,6 +44,21 @@ impl SamplingRateT {
   }
 }
 
+impl From<u8> for SamplingRateT {
+  fn from(item: u8) -> Self {
+    match item {
+      0 => SamplingRateT::SR22,
+      1 => SamplingRateT::SR32,
+      2 => SamplingRateT::SR44,
+      3 => SamplingRateT::SR48,
+      4 => SamplingRateT::SR88,
+      5 => SamplingRateT::SR96,
+      6 => SamplingRateT::SR192,
+      _ => SamplingRateT::UNDEF
+    }
+  }
+}
+
 #[repr(C, packed)]
 // #[derive(Debug)]
 pub struct JackTripHeader {

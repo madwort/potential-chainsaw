@@ -1,64 +1,9 @@
 use std::net::UdpSocket;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::io;
-// use std::slice;
 use crate::jack_trip_header::*;
 
 mod jack_trip_header;
-mod udp;
-
-
-fn udp_listen() -> std::io::Result<()> {
-  {
-    let mut socket = UdpSocket::bind("127.0.0.1:34254")?;
-    // Receives a single datagram message on the socket. If `buf` is too small to hold
-    // the message, it will be cut off.
-
-    // Current static calculations:
-    // header size = 64+16+16+8+8+8+8 = 128
-    // jack frame size = 16*256 = 4096
-    // therefore buffer size is (4096+128)/8 => u8 array length 528
-
-    let mut buf = [0; 528];
-    // output the connection details from the first packet
-    socket.recv_from(&mut buf)?;
-    let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
-    println!("{}", s);
-
-    while true {
-
-      let (amt, src) = socket.recv_from(&mut buf)?;
-
-      // println!("{:?}", buf);
-      // println!("amt {:?}", amt);
-      // println!("src {:?}", src);
-
-      // ==v1
-      let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
-      println!("Struct: {}", s);
-
-      match SystemTime::now().duration_since(UNIX_EPOCH) {
-          Ok(elapsed) => {
-              // it prints '2'
-              println!("Time: {:?}, {:?}", s.time_stamp, elapsed);
-              // println!("{}", elapsed.as_secs());
-          }
-          Err(e) => {
-              // an error occurred!
-              println!("Error: {:?}", e);
-          }
-      }
-
-      // Redeclare `buf` as slice of the received data and send reverse data back to origin.
-      let buf = &mut buf[..amt];
-      // if we don't reverse it, jacktrip client accepts it & sends more!
-      // buf.reverse();
-      socket.send_to(buf, &src)?;
-    }
-
-  } // the socket is closed here
-  Ok(())
-}
 
 fn jack_test() -> std::io::Result<()> {
   let (client, _status) = 
