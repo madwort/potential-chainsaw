@@ -1,5 +1,5 @@
 use std::net::UdpSocket;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::io;
 use std::convert::TryInto;
 use crate::jack_trip_header::*;
@@ -25,7 +25,7 @@ fn jack_test() -> std::io::Result<()> {
   //     .register_port("rust_send_r", jack::AudioOut::default())
   //     .unwrap();
 
-  let mut socket = UdpSocket::bind("127.0.0.1:34254")?;
+  let socket = UdpSocket::bind("127.0.0.1:34254")?;
   // Receives a single datagram message on the socket. If `buf` is too small to hold
   // the message, it will be cut off.
   let mut buf = [0u8; 528];
@@ -38,21 +38,15 @@ fn jack_test() -> std::io::Result<()> {
   assert!(s.num_channels == 1);
   assert!(s.buffer_size == 128);
 
-  let sample_rate = client.sample_rate();
-  let frame_t = 1.0 / sample_rate as f64;
-
   let mut outgoing_buf = [0u8; 528];
   let mut outgoing_sequence_number = 0u16;
 
   // Mirror source data back to itself for now
   let mut timestamp_bytes =
     (SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_micros() as u64).to_le_bytes();
-  // TODO: there *MUST* be a better way of doing this copy, instead of a for loop!
-  for x in 0..8 {
-    outgoing_buf[x] = timestamp_bytes[x];
-  }
-  outgoing_buf[8] = outgoing_sequence_number.to_le_bytes()[0];
-  outgoing_buf[9] = outgoing_sequence_number.to_le_bytes()[1];
+
+  outgoing_buf[0..8].copy_from_slice(&timestamp_bytes);
+  outgoing_buf[8..10].copy_from_slice(&outgoing_sequence_number.to_le_bytes());
   outgoing_buf[10] = 128u16.to_le_bytes()[0];
   outgoing_buf[11] = 128u16.to_le_bytes()[1];
   outgoing_buf[12] = buf[12];
@@ -70,7 +64,7 @@ fn jack_test() -> std::io::Result<()> {
       // TODO: can we allocate this outside the process_callback?
       let receive_a_p = receive_a.as_mut_slice(ps);
       // let receive_b_p = receive_b.as_mut_slice(ps);
-      let (amt, src) = socket.recv_from(&mut buf).unwrap();
+      let (_amt, src) = socket.recv_from(&mut buf).unwrap();
 
       // Debug output
       // let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
@@ -80,7 +74,7 @@ fn jack_test() -> std::io::Result<()> {
       count = 16;
       for v in receive_a_p.iter_mut() {
         temp_audio_data = buf[count..count+2].try_into().unwrap();
-        *v = (i16::from_le_bytes(temp_audio_data) as f32 / 32768.0);
+        *v = i16::from_le_bytes(temp_audio_data) as f32 / 32768.0;
         count = count + 2;
       }
 
@@ -98,6 +92,7 @@ fn jack_test() -> std::io::Result<()> {
       timestamp_bytes =
         (SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_micros() as u64).to_le_bytes();
 
+      outgoing_sequence_number = outgoing_sequence_number + 1;
       outgoing_buf[0..8].copy_from_slice(&timestamp_bytes);
       outgoing_buf[8..10].copy_from_slice(&outgoing_sequence_number.to_le_bytes());
 
@@ -119,8 +114,7 @@ fn jack_test() -> std::io::Result<()> {
 }
 
 fn main() -> std::io::Result<()> {
-    jack_test();
-    Ok(())
+    jack_test()
 }
 
 struct Notifications;
