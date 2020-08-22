@@ -93,12 +93,9 @@ fn jack_test() -> std::io::Result<()> {
 
       timestamp_bytes =
         (SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_micros() as u64).to_le_bytes();
-      // TODO: there *MUST* be a better way of doing this!
-      for x in 0..8 {
-        outgoing_buf[x] = timestamp_bytes[x];
-      }
-      outgoing_buf[8] = outgoing_sequence_number.to_le_bytes()[0];
-      outgoing_buf[9] = outgoing_sequence_number.to_le_bytes()[1];
+
+      outgoing_buf[0..8].copy_from_slice(&timestamp_bytes);
+      outgoing_buf[8..10].copy_from_slice(&outgoing_sequence_number.to_le_bytes());
 
       socket.send_to(&outgoing_buf, &src).unwrap();
       jack::Control::Continue
