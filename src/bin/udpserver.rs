@@ -1,5 +1,5 @@
 use std::net::UdpSocket;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::fmt;
 use std::convert::TryInto;
 
@@ -134,7 +134,7 @@ fn main() -> std::io::Result<()> {
       let mut buf = [0u8; 528];
 
       // output the connection details from the first packet
-      let (amt, src) = socket.recv_from(&mut buf)?;
+      let (_amt, src) = socket.recv_from(&mut buf)?;
 
       println!("Read the buffer using unsafe case");
       let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
