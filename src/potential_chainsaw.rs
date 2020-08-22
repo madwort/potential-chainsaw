@@ -52,24 +52,24 @@ fn receive_first_packet(mut buf: [u8; 528],
 pub fn jacktrip_connect(debug_mode: bool, client_mode: bool, client_address: std::string::String) -> std::io::Result<()> {
   let (client_receive, _status) =
     if client_mode {
-      jack::Client::new("pc_client_receive", jack::ClientOptions::NO_START_SERVER).unwrap()
+      jack::Client::new("chainsaw_client_receive", jack::ClientOptions::NO_START_SERVER).unwrap()
     } else {
-      jack::Client::new("pc_server_receive", jack::ClientOptions::NO_START_SERVER).unwrap()
+      jack::Client::new("chainsaw_server_receive", jack::ClientOptions::NO_START_SERVER).unwrap()
     };
   let (client_send, _status) =
     if client_mode {
-      jack::Client::new("pc_client_send", jack::ClientOptions::NO_START_SERVER).unwrap()
+      jack::Client::new("chainsaw_client_send", jack::ClientOptions::NO_START_SERVER).unwrap()
     } else {
-      jack::Client::new("pc_server_send", jack::ClientOptions::NO_START_SERVER).unwrap()
+      jack::Client::new("chainsaw_server_send", jack::ClientOptions::NO_START_SERVER).unwrap()
     };
 
   // "Receive" takes audio data from the network and sends it to the local jack server
   // Therefore it is an AudioOut port from the perspective of this program
   let mut receive_a = client_receive
-      .register_port("rust_receive_l", jack::AudioOut::default())
+      .register_port("receive_l", jack::AudioOut::default())
       .unwrap();
   let send_a = client_send
-      .register_port("rust_send_l", jack::AudioIn::default())
+      .register_port("send_l", jack::AudioIn::default())
       .unwrap();
 
   let socket_receive =
