@@ -1,6 +1,7 @@
 use std::net::UdpSocket;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::io;
+use std::convert::TryInto;
 use crate::jack_trip_header::*;
 
 mod jack_trip_header;
@@ -59,24 +60,28 @@ fn jack_test() -> std::io::Result<()> {
   outgoing_buf[14] = buf[14];
   outgoing_buf[15] = buf[15];
 
+  // Create some temp vars to use in the process_callback
   let mut temp_audio_data = [0u8; 2];
+  let mut count = 0;
 
   let process_callback = move |_: &jack::Client, ps: &jack::ProcessScope| -> jack::Control {
-    // xrun when nothing to read from buf!
+      // TODO: xrun when nothing to read from buf! Fixme!
 
-    // TODO: move all of these `let` expressions out of this function!
+      // TODO: can we allocate this outside the process_callback?
       let receive_a_p = receive_a.as_mut_slice(ps);
       // let receive_b_p = receive_b.as_mut_slice(ps);
       let (amt, src) = socket.recv_from(&mut buf).unwrap();
-      let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
 
-      println!("Input: {}", s);
+      // Debug output
+      // let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
+      // println!("Input: {}", s);
 
       // TODO: get rid of these ugly count vars!!! OMG!
-      let mut count = 0;
+      count = 16;
       for v in receive_a_p.iter_mut() {
-        *v = s.get_jack_data(count);
-        count = count + 1;
+        temp_audio_data = buf[count..count+2].try_into().unwrap();
+        *v = (i16::from_le_bytes(temp_audio_data) as f32 / 32768.0);
+        count = count + 2;
       }
 
       let send_a_p = send_a.as_slice(ps);
@@ -84,8 +89,7 @@ fn jack_test() -> std::io::Result<()> {
       count = 16;
       for v in send_a_p.iter() {
         temp_audio_data = (((*v) * 32768.0) as i16).to_le_bytes();
-        outgoing_buf[count] = temp_audio_data[0];
-        outgoing_buf[count+1] = temp_audio_data[1];
+        outgoing_buf[count..count+2].clone_from_slice(&temp_audio_data);
         count = count + 2;
       }
       // send_a_p.clone_from_slice(output_packet.data);
