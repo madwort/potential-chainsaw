@@ -153,13 +153,17 @@ fn main() -> std::io::Result<()> {
 
       // Send our first outbound packet, reflecting details back at them
       let mut outgoing_buf = [0u8; 528];
+      let mut outgoing_sequence_number = 0u16;
 
       // Mirror source data back to itself for now
-      let mut timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_micros() as u64;
+      let mut timestamp_bytes =
+        (SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_micros() as u64).to_le_bytes();
       // TODO: there *MUST* be a better way of doing this!
       for x in 0..8 {
-        outgoing_buf[x] = timestamp.to_le_bytes()[x];
+        outgoing_buf[x] = timestamp_bytes[x];
       }
+      outgoing_buf[8] = outgoing_sequence_number.to_le_bytes()[0];
+      outgoing_buf[9] = outgoing_sequence_number.to_le_bytes()[1];
       outgoing_buf[10] = 128u16.to_le_bytes()[0];
       outgoing_buf[11] = 128u16.to_le_bytes()[1];
       outgoing_buf[12] = buf[12];
@@ -169,6 +173,8 @@ fn main() -> std::io::Result<()> {
       let t: JackTripHeader = unsafe { std::ptr::read(outgoing_buf.as_ptr() as *const _)};
       println!("{}", t);
       socket.send_to(&outgoing_buf, &src)?;
+
+      // return Ok(());
 
       while true {
 
@@ -192,6 +198,14 @@ fn main() -> std::io::Result<()> {
             }
         }
 
+        timestamp_bytes =
+          (SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_micros() as u64).to_le_bytes();
+        // TODO: there *MUST* be a better way of doing this!
+        for x in 0..8 {
+          outgoing_buf[x] = timestamp_bytes[x];
+        }
+        outgoing_buf[8] = outgoing_sequence_number.to_le_bytes()[0];
+        outgoing_buf[9] = outgoing_sequence_number.to_le_bytes()[1];
         socket.send_to(&outgoing_buf, &src)?;
       }
 
