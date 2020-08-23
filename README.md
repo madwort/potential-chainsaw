@@ -29,6 +29,10 @@ $ cargo build --bin udpserver
 $ ./target/debug/udpserver
 ```
 
+### Release builds
+
+To build for release, add `--release` and use the binary in `./target/release/`.
+
 ## Dependencies 
 
 [rust-jack](https://github.com/RustAudio/rust-jack)
