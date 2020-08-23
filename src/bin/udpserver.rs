@@ -25,13 +25,17 @@ fn print_sample_data_from_buf(buf: [u8; 1492]) {
   let buffer_size_direct_read = u16::from_le_bytes(buf[10..12].try_into().unwrap());
   println!("Buffer size u8 {}", buffer_size_direct_read);
 
-  for x in 0..buffer_size_direct_read as usize {
-    println!("{} ; {:?}", x,
+  for x in 0..(buffer_size_direct_read*3) as usize {
+    print!("{:>3}: {:>6} ", x,
       i16::from_le_bytes(buf[((x*2)+16)..((x*2)+18)].try_into().unwrap())
     );
+    if (x+1)%16 == 0 {
+      println!("");
+    }
   }
 }
 
+#[allow(dead_code)]
 fn print_sample_data_from_buf_both(buf: [u8; 1492]) {
   let s = JackTripHeader::from(buf);
   let buffer_size_direct_read = u16::from_le_bytes(buf[10..12].try_into().unwrap());
@@ -39,9 +43,12 @@ fn print_sample_data_from_buf_both(buf: [u8; 1492]) {
 
   for x in 0..(buffer_size_direct_read*3) as usize {
     unsafe {
-      print!("{} ; {:?}; {:?} : ", x, s.data[x],
+      print!("{:>3} ; {:>4}; {:>4} : ", x, s.data[x],
         i16::from_le_bytes(buf[((x*2)+16)..((x*2)+18)].try_into().unwrap())
       );
+      if (x+1)%8 == 0 {
+        println!("");
+      }
     }
   }
 }
@@ -91,8 +98,8 @@ fn main() -> std::io::Result<()> {
       }
       outgoing_buf[8] = outgoing_sequence_number.to_le_bytes()[0];
       outgoing_buf[9] = outgoing_sequence_number.to_le_bytes()[1];
-      outgoing_buf[10] = 1024u16.to_le_bytes()[0];
-      outgoing_buf[11] = 1024u16.to_le_bytes()[1];
+      outgoing_buf[10] = 128u16.to_le_bytes()[0];
+      outgoing_buf[11] = 128u16.to_le_bytes()[1];
       outgoing_buf[12] = buf[12];
       outgoing_buf[13] = buf[13];
       outgoing_buf[14] = buf[14];
@@ -112,7 +119,7 @@ fn main() -> std::io::Result<()> {
         // println!("amt {:?}", amt);
         // println!("src {:?}", src);
 
-        print_sample_data_from_buf_both(buf);
+        print_sample_data_from_buf(buf);
 
         match SystemTime::now().duration_since(UNIX_EPOCH) {
             Ok(elapsed) => {
