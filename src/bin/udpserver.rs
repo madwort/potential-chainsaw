@@ -6,6 +6,7 @@ use std::fmt;
 use std::convert::TryInto;
 
 use potential_chainsaw::jack_trip_header::*;
+use potential_chainsaw::sampling_rate_t::*;
 
 #[allow(dead_code)]
 fn print_sample_data_from_buf_unsafe(buf: [u8; 528]) {
