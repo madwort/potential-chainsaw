@@ -3,7 +3,7 @@ use std::net::{SocketAddr};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::io;
 use std::convert::TryInto;
-use crate::jack_trip_header::*;
+use crate::jack_trip_header::JackTripHeader;
 use crate::jack_notifications::Notifications;
 
 fn get_current_timestamp() -> [u8; 8]{
