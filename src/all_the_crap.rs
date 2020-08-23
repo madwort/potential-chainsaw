@@ -132,7 +132,9 @@ pub fn jacktrip_connect(debug_mode: bool, client_mode: bool, client_address: std
       // // let send_b_p = send_b.as_slice(ps);
       count = 16;
       for v in send_a_p.iter() {
-        temp_audio_data = (((*v) * 32768.0) as i16).to_le_bytes();
+        // TODO: verify if this should be 32767 or 32768
+        // Only an issue when overflowing, but might make overflows less gritchy?
+        temp_audio_data = (((*v) * 32767.0) as i16).to_le_bytes();
         outgoing_buf[count..count+2].clone_from_slice(&temp_audio_data);
         count = count + 2;
       }
