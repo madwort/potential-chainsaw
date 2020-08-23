@@ -31,8 +31,7 @@ fn send_first_packet(socket_send: std::net::UdpSocket, src: std::net::SocketAddr
   outgoing_buf[13] = 16;
   outgoing_buf[14] = 1;
   outgoing_buf[15] = 0;
-  let t: JackTripHeader = unsafe { std::ptr::read(outgoing_buf.as_ptr() as *const _)};
-  println!("Output: {}", t);
+  println!("Output: {}", JackTripHeader::from(outgoing_buf));
 
   socket_send.send_to(&outgoing_buf, &src).unwrap();
   // We're going to re-use this buffer, so return it
@@ -44,8 +43,7 @@ fn receive_first_packet(mut buf: [u8; 528],
     sample_rate: usize) -> std::net::SocketAddr
 {
   let (_amt, src) = socket_receive.recv_from(&mut buf).unwrap();
-  let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
-  verify_connection_params(s, sample_rate);
+  verify_connection_params(JackTripHeader::from(buf), sample_rate);
   src
 }
 
@@ -116,8 +114,7 @@ pub fn jacktrip_connect(debug_mode: bool, client_mode: bool, client_address: std
       socket_receive.recv_from(&mut buf).unwrap();
 
       if debug_mode {
-        let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
-        println!("Input: {}", s);
+        println!("Input: {}", JackTripHeader::from(buf));
       }
 
       // TODO: get rid of these ugly count vars!!! OMG!
@@ -150,8 +147,7 @@ pub fn jacktrip_connect(debug_mode: bool, client_mode: bool, client_address: std
       outgoing_buf[8..10].copy_from_slice(&outgoing_sequence_number.to_le_bytes());
 
       if debug_mode {
-        let t: JackTripHeader = unsafe { std::ptr::read(outgoing_buf.as_ptr() as *const _)};
-        println!("Output: {}", t);
+        println!("Output: {}", JackTripHeader::from(outgoing_buf));
       }
 
       socket_send.send_to(&outgoing_buf, &src).unwrap();

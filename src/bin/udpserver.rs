@@ -8,9 +8,9 @@ use std::convert::TryInto;
 use potential_chainsaw::jack_trip_header::*;
 
 #[allow(dead_code)]
-fn print_sample_data_from_buf_unsafe(buf: &[u8]) {
+fn print_sample_data_from_buf_unsafe(buf: [u8; 528]) {
   unsafe {
-    let s: JackTripHeader = std::ptr::read(buf.as_ptr() as *const _);
+    let s = JackTripHeader::from(buf);
     println!("Buffer size u8 {}", s.buffer_size);
     for x in 0..s.buffer_size as usize {
       println!("{} ; {:?} ; {:?}", x, s.get_jack_data(x), s.data[x]);
@@ -21,7 +21,7 @@ fn print_sample_data_from_buf_unsafe(buf: &[u8]) {
 }
 
 #[allow(dead_code)]
-fn print_sample_data_from_buf(buf: &[u8]) {
+fn print_sample_data_from_buf(buf: [u8; 528]) {
   let buffer_size_direct_read = u16::from_le_bytes(buf[10..12].try_into().unwrap());
   println!("Buffer size u8 {}", buffer_size_direct_read);
 
@@ -32,8 +32,8 @@ fn print_sample_data_from_buf(buf: &[u8]) {
   }
 }
 
-fn print_sample_data_from_buf_both(buf: &[u8]) {
-  let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
+fn print_sample_data_from_buf_both(buf: [u8; 528]) {
+  let s = JackTripHeader::from(buf);
   let buffer_size_direct_read = u16::from_le_bytes(buf[10..12].try_into().unwrap());
   println!("Buffer size u8 {}", buffer_size_direct_read);
 
@@ -63,7 +63,7 @@ fn main() -> std::io::Result<()> {
       let (_amt, src) = socket.recv_from(&mut buf)?;
 
       println!("Read the buffer using unsafe case");
-      let s: JackTripHeader = unsafe { std::ptr::read(buf.as_ptr() as *const _)};
+      let s = JackTripHeader::from(buf);
       println!("{}", s);
 
       println!("Read the buffer using try_into / from_le_bytes etc");
@@ -96,8 +96,7 @@ fn main() -> std::io::Result<()> {
       outgoing_buf[13] = buf[13];
       outgoing_buf[14] = buf[14];
       outgoing_buf[15] = buf[15];
-      let t: JackTripHeader = unsafe { std::ptr::read(outgoing_buf.as_ptr() as *const _)};
-      println!("{}", t);
+      println!("{}", JackTripHeader::from(outgoing_buf));
       socket.send_to(&outgoing_buf, &src)?;
 
       // return Ok(());
@@ -112,7 +111,7 @@ fn main() -> std::io::Result<()> {
         // println!("amt {:?}", amt);
         // println!("src {:?}", src);
 
-        print_sample_data_from_buf_both(&buf);
+        print_sample_data_from_buf_both(buf);
 
         match SystemTime::now().duration_since(UNIX_EPOCH) {
             Ok(elapsed) => {

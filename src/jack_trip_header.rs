@@ -108,3 +108,11 @@ impl fmt::Display for JackTripHeader {
     }
   }
 }
+
+impl From<[u8; 528]> for JackTripHeader {
+  // TODO: check whether this is duplicating the array in memory
+  fn from(item: [u8; 528]) -> Self {
+    let s: JackTripHeader = unsafe { std::ptr::read(item.as_ptr() as *const _)};
+    s
+  }
+}
