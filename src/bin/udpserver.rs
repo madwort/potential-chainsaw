@@ -8,7 +8,7 @@ use potential_chainsaw::jack_trip_header::*;
 use potential_chainsaw::sampling_rate_t::*;
 
 #[allow(dead_code)]
-fn print_sample_data_from_buf_unsafe(buf: [u8; 528]) {
+fn print_sample_data_from_buf_unsafe(buf: [u8; 1492]) {
   unsafe {
     let s = JackTripHeader::from(buf);
     println!("Buffer size u8 {}", s.buffer_size);
@@ -21,7 +21,7 @@ fn print_sample_data_from_buf_unsafe(buf: [u8; 528]) {
 }
 
 #[allow(dead_code)]
-fn print_sample_data_from_buf(buf: [u8; 528]) {
+fn print_sample_data_from_buf(buf: [u8; 1492]) {
   let buffer_size_direct_read = u16::from_le_bytes(buf[10..12].try_into().unwrap());
   println!("Buffer size u8 {}", buffer_size_direct_read);
 
@@ -32,14 +32,14 @@ fn print_sample_data_from_buf(buf: [u8; 528]) {
   }
 }
 
-fn print_sample_data_from_buf_both(buf: [u8; 528]) {
+fn print_sample_data_from_buf_both(buf: [u8; 1492]) {
   let s = JackTripHeader::from(buf);
   let buffer_size_direct_read = u16::from_le_bytes(buf[10..12].try_into().unwrap());
   println!("Buffer size u8 {}", buffer_size_direct_read);
 
-  for x in 0..buffer_size_direct_read as usize {
+  for x in 0..(buffer_size_direct_read*3) as usize {
     unsafe {
-      println!("{} ; {:?}; {:?}", x, s.data[x],
+      print!("{} ; {:?}; {:?} : ", x, s.data[x],
         i16::from_le_bytes(buf[((x*2)+16)..((x*2)+18)].try_into().unwrap())
       );
     }
@@ -53,11 +53,12 @@ fn main() -> std::io::Result<()> {
       // the message, it will be cut off.
 
       // Current static calculations:
-      // header size = 64+16+16+8+8+8+8 = 128
-      // jack frame size = 16*256 = 4096
-      // therefore buffer size is (4096+128)/8 => u8 array length 528
+      // header size = 64+16+16+8+8+8+8 = 128bits => 16bytes
+      // jack frame size = 16*256 = 4096bits
+      // therefore buffer size is (4096+128)/8 => 528bytes => [u8; 528]
+      // Using 1492 which is my personal current MTU!
 
-      let mut buf = [0u8; 528];
+      let mut buf = [0u8; 1492];
 
       // output the connection details from the first packet
       let (_amt, src) = socket.recv_from(&mut buf)?;
@@ -78,7 +79,7 @@ fn main() -> std::io::Result<()> {
       );
 
       // Send our first outbound packet, reflecting details back at them
-      let mut outgoing_buf = [0u8; 528];
+      let mut outgoing_buf = [0u8; 1492];
       let mut outgoing_sequence_number = 0u16;
 
       // Mirror source data back to itself for now
@@ -90,8 +91,8 @@ fn main() -> std::io::Result<()> {
       }
       outgoing_buf[8] = outgoing_sequence_number.to_le_bytes()[0];
       outgoing_buf[9] = outgoing_sequence_number.to_le_bytes()[1];
-      outgoing_buf[10] = 128u16.to_le_bytes()[0];
-      outgoing_buf[11] = 128u16.to_le_bytes()[1];
+      outgoing_buf[10] = 1024u16.to_le_bytes()[0];
+      outgoing_buf[11] = 1024u16.to_le_bytes()[1];
       outgoing_buf[12] = buf[12];
       outgoing_buf[13] = buf[13];
       outgoing_buf[14] = buf[14];

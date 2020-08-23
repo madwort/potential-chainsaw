@@ -14,7 +14,7 @@ pub struct JackTripHeader {
   pub num_channels: u8, ///< Number of Channels, we assume input and outputs are the same
   pub connection_mode: u8,
   // assume bit res 16 (u16 elements) & max buffer size 256 (array size 256)
-  pub data: [i16; 256], // Jack frames per period size (typically 64/128/256 etc)
+  pub data: [i16; 1476], // Jack frames per period size (typically 64/128/256 etc)
 }
 
 impl JackTripHeader {
@@ -51,9 +51,18 @@ impl fmt::Display for JackTripHeader {
   }
 }
 
+// This is for compatibility with old code
+// TODO: Remove once jacktrip_client starts using MTU rather than 528 for buffer size
 impl From<[u8; 528]> for JackTripHeader {
-  // TODO: check whether this is duplicating the array in memory
   fn from(item: [u8; 528]) -> Self {
+    let s: JackTripHeader = unsafe { std::ptr::read(item.as_ptr() as *const _)};
+    s
+  }
+}
+
+impl From<[u8; 1492]> for JackTripHeader {
+  // TODO: check whether this is duplicating the array in memory
+  fn from(item: [u8; 1492]) -> Self {
     let s: JackTripHeader = unsafe { std::ptr::read(item.as_ptr() as *const _)};
     s
   }
