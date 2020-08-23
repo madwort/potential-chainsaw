@@ -2,7 +2,6 @@ extern crate potential_chainsaw;
 
 use std::net::UdpSocket;
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::fmt;
 use std::convert::TryInto;
 
 use potential_chainsaw::jack_trip_header::*;
